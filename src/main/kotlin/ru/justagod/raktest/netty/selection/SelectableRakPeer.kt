@@ -18,7 +18,19 @@ class SelectableRakPeer(val peer: RakPeerInterface) {
 
     private var unownedSelector: RakPeerSelector? = null
 
-    private fun select() {
+    private var selectionFlag = false
+
+    @Synchronized
+    private fun captureFlag(): Boolean {
+        return if (selectionFlag) false
+        else {
+            selectionFlag = true
+            true
+        }
+    }
+
+    private fun select(): Boolean {
+        if (!captureFlag()) return false
         var pending = peer.GetReceiveBufferSize()
 
         while (pending > 0) {
@@ -41,6 +53,8 @@ class SelectableRakPeer(val peer: RakPeerInterface) {
 
             pending--
         }
+        selectionFlag = false
+        return true
     }
 
     fun makeUnownedSelector(channel: RakNetAbstractChannel): RakPeerSelector {
@@ -82,28 +96,34 @@ class SelectableRakPeer(val peer: RakPeerInterface) {
     inner class RakPeerSelector(val channel: RakNetAbstractChannel)  {
 
         private val queue = LinkedBlockingQueue<PacketRef>()
+        private var counter = 0
 
+        @Synchronized
         fun push(packet: PacketRef) {
+            counter++
             queue.offer(packet)
         }
 
         // caller is responsible for deallocating packet
+        @Synchronized
         fun next(): RakPacket? {
+            if (counter <= 0) return null
             var ref = queue.poll()
+            counter--
             while (ref != null) {
                 val pkt = ref.drop()
                 if (pkt != null) return pkt
 
                 ref = queue.poll()
+                counter--
             }
 
             return null
 
         }
 
-        fun select() {
-            this@SelectableRakPeer.select()
-        }
+        fun select() = this@SelectableRakPeer.select()
+
 
     }
 

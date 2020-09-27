@@ -59,6 +59,8 @@ class RakNetEventLoop(
 
             }
 
+            Thread.sleep(5)
+
         }
     }
 
@@ -68,8 +70,9 @@ class RakNetEventLoop(
         val result = arrayListOf<Pair<RakPacket, RakNetAbstractChannel>>()
 
         synchronized(selectors) {
-            while (elapsed < timeLimit) {
-                for (selector in selectors) {
+            while (elapsed <= timeLimit) {
+                for (i in selectors.indices) {
+                    val selector = selectors[i]
                     result += (selector.next() ?: continue) to selector.channel
                 }
                 elapsed = System.currentTimeMillis() - start
@@ -107,6 +110,6 @@ class RakNetEventLoop(
     }
 
     companion object {
-        private const val MAX_SELECTION_TIME = 100L
+        private const val MAX_SELECTION_TIME = 0L
     }
 }
